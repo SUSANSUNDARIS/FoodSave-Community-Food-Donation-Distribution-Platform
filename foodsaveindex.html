@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>FoodSave</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    h1 { text-align: center; }
+
+    nav {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    nav button {
+      padding: 8px 15px;
+      margin: 0 5px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background-color: #007bff;
+      color: #fff;
+    }
+    nav button:hover { background-color: #0056b3; }
+
+    input, select {
+      width: 100%;
+      padding: 5px;
+      margin: 5px 0;
+    }
+
+    .section {
+      display: none;
+    }
+
+    .card {
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 6px;
+    }
+
+    img.donation-img {
+      max-width: 100px;
+      display: block;
+      margin: 5px 0;
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 8px 15px;
+      border: none;
+      border-radius: 5px;
+      color: #fff;
+      margin: 5px;
+      cursor: pointer;
+    }
+    .btn.add { background: #28a745; }
+    .btn.add:hover { background: #218838; }
+
+    .btn.clear { background: #dc3545; }
+    .btn.clear:hover { background: #c82333; }
+
+    .btn.export { background: #007bff; }
+    .btn.export:hover { background: #0069d9; }
+
+    .btn.collected { background: #17a2b8; }
+    .btn.collected:hover { background: #138496; }
+
+    #toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #28a745;
+      color: #fff;
+      padding: 10px 20px;
+      border-radius: 5px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>FoodSave</h1>
+
+  <nav>
+    <button onclick="showSection('donorSection')">Donor Dashboard</button>
+    <button onclick="showSection('ngoSection')">NGO Dashboard</button>
+    <button onclick="showSection('statsSection')">Impact Stats</button>
+  </nav>
+
+  <!-- Donor Section -->
+  <div id="donorSection" class="section">
+    <h2>Donor Dashboard</h2>
+    <form id="donationForm">
+      <label>Food Item:</label><br>
+      <input type="text" id="foodItem" required><br>
+
+      <label>Quantity:</label><br>
+      <input type="number" id="quantity" required><br>
+
+      <label>Contact:</label><br>
+      <input type="text" id="contact" required><br>
+
+      <label>Upload Image (optional):</label><br>
+      <input type="file" id="imageUpload" accept="image/*"><br><br>
+
+      <button class="btn add" type="submit">Add Donation</button>
+    </form>
+  </div>
+
+  <!-- NGO Section -->
+  <div id="ngoSection" class="section">
+    <h2>NGO / Volunteer Dashboard</h2>
+    <div id="donationList"></div>
+    <button class="btn clear" onclick="clearAllDonations()">Clear All Donations</button>
+    <button class="btn export" onclick="exportCSV()">Export as CSV</button>
+  </div>
+
+  <!-- Stats Section -->
+  <div id="statsSection" class="section">
+    <h2>Impact Stats</h2>
+    <div id="stats"></div>
+  </div>
+
+  <div id="toast"></div>
+
+  <script>
+    // Section switching
+    function showSection(id){
+      document.querySelectorAll('.section').forEach(s=>s.style.display='none');
+      document.getElementById(id).style.display='block';
+      if(id==='ngoSection'){ displayDonationsForNGO(); }
+      if(id==='statsSection'){ displayStats(); }
+    }
+    showSection('donorSection'); // show donor by default
+
+    // Add donation
+    document.getElementById('donationForm')?.addEventListener('submit', function (e) {
+      e.preventDefault();
+      const foodItem = document.getElementById('foodItem').value;
+      const quantity = document.getElementById('quantity').value;
+      const contact = document.getElementById('contact').value;
+      const imageInput = document.getElementById('imageUpload');
+      const donations = JSON.parse(localStorage.getItem('donations')) || [];
+
+      let imageData = "";
+      if (imageInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function () {
+          imageData = reader.result;
+          donations.push({ foodItem, quantity, contact, imageData, status: "pending" });
+          localStorage.setItem('donations', JSON.stringify(donations));
+          showToast("Donation added successfully!");
+          document.getElementById('donationForm').reset();
+        };
+        reader.readAsDataURL(imageInput.files[0]);
+      } else {
+        donations.push({ foodItem, quantity, contact, imageData, status: "pending" });
+        localStorage.setItem('donations', JSON.stringify(donations));
+        showToast("Donation added successfully!");
+        document.getElementById('donationForm').reset();
+      }
+    });
+
+    // NGO view
+    function displayDonationsForNGO() {
+      const donations = JSON.parse(localStorage.getItem('donations')) || [];
+      const list = document.getElementById('donationList');
+      list.innerHTML = '';
+
+      donations.forEach((donation, index) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <strong>${donation.foodItem}</strong> (Qty: ${donation.quantity})<br>
+          Donor: ${donation.contact}<br>
+          ${donation.imageData ? `<img src="${donation.imageData}" class="donation-img">` : ''}
+          Status: ${donation.status}<br>
+          <button class="btn collected" onclick="markAsCollected(${index})">Mark as Collected</button>
+          <button class="btn clear" onclick="deleteDonation(${index})">Delete</button>
+        `;
+        list.appendChild(card);
+      });
+    }
+
+    function markAsCollected(i) {
+      let donations = JSON.parse(localStorage.getItem('donations')) || [];
+      donations[i].status = "collected";
+      localStorage.setItem('donations', JSON.stringify(donations));
+      displayDonationsForNGO();
+    }
+
+    function deleteDonation(i) {
+      let donations = JSON.parse(localStorage.getItem('donations')) || [];
+      donations.splice(i, 1);
+      localStorage.setItem('donations', JSON.stringify(donations));
+      displayDonationsForNGO();
+    }
+
+    function clearAllDonations() {
+      localStorage.removeItem('donations');
+      displayDonationsForNGO();
+    }
+
+    function exportCSV() {
+      const donations = JSON.parse(localStorage.getItem('donations')) || [];
+      let csv = "Food Item,Quantity,Contact,Status\n";
+      donations.forEach(d => {
+        csv += `${d.foodItem},${d.quantity},${d.contact},${d.status}\n`;
+      });
+      const blob = new Blob([csv], { type: "text/csv" });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = "donations.csv";
+      a.click();
+    }
+
+    // Stats page
+    function displayStats() {
+      const donations = JSON.parse(localStorage.getItem('donations')) || [];
+      const total = donations.length;
+      const collected = donations.filter(d => d.status === "collected").length;
+      const pending = total - collected;
+
+      document.getElementById('stats').innerHTML = `
+        <p><strong>Total Donations:</strong> ${total}</p>
+        <p><strong>Collected:</strong> ${collected}</p>
+        <p><strong>Pending:</strong> ${pending}</p>
+      `;
+    }
+
+    // Toast
+    function showToast(message) {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.style.display = 'block';
+      setTimeout(() => toast.style.display = 'none', 2000);
+    }
+  </script>
+</body>
+</html>
